@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: '/api',
   timeout: 10000,
 })
 
@@ -9,6 +9,14 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  // Add trailing slash (last segment is resource name, not ID or extension)
+  if (config.url && !config.url.includes('?') && !config.url.endsWith('/')) {
+    const segments = config.url.split('/').filter(Boolean)
+    const last = segments[segments.length - 1] || ''
+    if (last && !/^\d+$/.test(last) && !last.includes('.')) {
+      config.url = config.url + '/'
+    }
   }
   return config
 })
