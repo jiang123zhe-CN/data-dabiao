@@ -13,6 +13,8 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  SafetyOutlined,
+  TagOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../hooks/useAuth'
 import './AppLayout.css'
@@ -28,6 +30,9 @@ const menuItems = [
   { key: '/users', icon: <UserOutlined />, label: '用户管理', roles: ['admin'] },
   { key: '/logs', icon: <FileTextOutlined />, label: '操作日志', roles: ['reviewer', 'admin'] },
   { key: '/reports', icon: <BarChartOutlined />, label: '报表', roles: ['admin'] },
+  { key: '/standards', icon: <SafetyOutlined />, label: '标准管理', roles: ['system_admin', 'admin'] },
+  { key: '/tagging', icon: <TagOutlined />, label: '数据打标', roles: ['data_admin', 'admin'] },
+  { key: '/compliance', icon: <AuditOutlined />, label: '合规审计', roles: ['admin'] },
 ]
 
 export default function AppLayout() {
@@ -54,7 +59,7 @@ export default function AppLayout() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider trigger={null} collapsible collapsed={collapsed} theme="dark" width={220}>
         <div className="logo">
-          {collapsed ? 'D' : '数据资产平台'}
+          {collapsed ? 'D' : '数据分类分级平台'}
         </div>
         <Menu
           theme="dark"

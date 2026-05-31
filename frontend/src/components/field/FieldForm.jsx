@@ -2,7 +2,6 @@ import { useEffect } from 'react'
 import { Form, Input, Select, InputNumber, Button, Space } from 'antd'
 
 const DATA_TYPES = ['VARCHAR', 'INT', 'BIGINT', 'DECIMAL', 'DATE', 'DATETIME', 'TIMESTAMP', 'TEXT', 'BOOLEAN', 'FLOAT']
-const SENSITIVITY_LEVELS = ['L1', 'L2', 'L3', 'L4']
 
 export default function FieldForm({ initialData, onSubmit, onCancel, loading }) {
   const [form] = Form.useForm()
@@ -42,9 +41,6 @@ export default function FieldForm({ initialData, onSubmit, onCancel, loading }) 
       </Form.Item>
       <Form.Item name="business_domain" label="业务域">
         <Input placeholder="如：客户域、财务域、人力域" />
-      </Form.Item>
-      <Form.Item name="sensitivity_level" label="敏感等级" initialValue="L1">
-        <Select options={SENSITIVITY_LEVELS.map((l) => ({ value: l, label: l }))} />
       </Form.Item>
       <Form.Item name="description" label="描述">
         <Input.TextArea rows={3} />

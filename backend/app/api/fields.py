@@ -2,7 +2,7 @@ import io
 import math
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
@@ -14,6 +14,7 @@ from app.models.field import Field, ImportRecord
 from app.schemas.field import FieldCreate, FieldUpdate, FieldResponse, ImportRecordResponse
 from app.schemas.common import PaginatedResponse
 from app.services.excel_service import generate_template, import_fields, export_fields_to_excel
+from app.services.log_service import log_action
 
 router = APIRouter(prefix="/api/fields", tags=["Fields"])
 
@@ -86,6 +87,7 @@ def create_field(
     body: FieldCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("data_entry", "data_admin", "admin")),
+    request: Request = None,
 ):
     if db.query(Field).filter(Field.field_code == body.field_code).first():
         raise HTTPException(status_code=400, detail="Field code already exists")
@@ -93,6 +95,24 @@ def create_field(
     db.add(field)
     db.commit()
     db.refresh(field)
+
+    # Auto-classify via rule engine
+    from app.services.rule_engine import RuleEngine
+    engine = RuleEngine(db)
+    result = engine.classify_field(field)
+    if result["category_id"] or result["tier_level"]:
+        field.classification_id = result.get("category_id") or field.classification_id
+        field.sensitivity_level = result.get("tier_level") or field.sensitivity_level
+        field.tagging_method = "rule_engine"
+        field.tagging_confidence = result.get("confidence", 0.0)
+        field.last_tagged_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(field)
+
+    log_action(db, user_id=current_user.id, username=current_user.username,
+               action="create", module="fields", target_type="field", target_id=field.id,
+               detail={"field_code": field.field_code, "name": field.name},
+               ip_address=request.client.host if request else None)
     return field
 
 
@@ -110,6 +130,7 @@ def update_field(
     body: FieldUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("data_entry", "data_admin", "reviewer", "admin")),
+    request: Request = None,
 ):
     field = db.query(Field).filter(Field.id == field_id).first()
     if not field:
@@ -121,6 +142,10 @@ def update_field(
     field.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(field)
+    log_action(db, user_id=current_user.id, username=current_user.username,
+               action="update", module="fields", target_type="field", target_id=field.id,
+               detail={"changed": list(update_data.keys())},
+               ip_address=request.client.host if request else None)
     return field
 
 
@@ -128,13 +153,18 @@ def update_field(
 def delete_field(
     field_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_role("data_admin", "admin")),
+    current_user: User = Depends(require_role("data_admin", "admin")),
+    request: Request = None,
 ):
     field = db.query(Field).filter(Field.id == field_id).first()
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
     field.status = "inactive"
     db.commit()
+    log_action(db, user_id=current_user.id, username=current_user.username,
+               action="delete", module="fields", target_type="field", target_id=field_id,
+               detail={"field_code": field.field_code},
+               ip_address=request.client.host if request else None)
     return {"message": "Field deactivated"}
 
 
@@ -153,11 +183,16 @@ def import_fields_excel(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("data_entry", "data_admin", "admin")),
+    request: Request = None,
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="Only .xlsx/.xls files are supported")
     content = file.file.read()
     result = import_fields(db, io.BytesIO(content), current_user, file.filename, len(content))
+    log_action(db, user_id=current_user.id, username=current_user.username,
+               action="import", module="fields", target_type="import_record", target_id=result.id,
+               detail={"file_name": file.filename, "total": result.total_rows, "success": result.success_rows},
+               ip_address=request.client.host if request else None)
     return result
 
 

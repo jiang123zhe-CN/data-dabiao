@@ -11,6 +11,9 @@ import ReviewPage from './pages/ReviewPage'
 import UserPage from './pages/UserPage'
 import OperationLogPage from './pages/OperationLogPage'
 import ReportPage from './pages/ReportPage'
+import StandardPage from './pages/StandardPage'
+import TaggingPage from './pages/TaggingPage'
+import CompliancePage from './pages/CompliancePage'
 
 function App() {
   return (
@@ -27,6 +30,9 @@ function App() {
             <Route path="/users" element={<UserPage />} />
             <Route path="/logs" element={<OperationLogPage />} />
             <Route path="/reports" element={<ReportPage />} />
+            <Route path="/standards" element={<StandardPage />} />
+            <Route path="/tagging" element={<TaggingPage />} />
+            <Route path="/compliance" element={<CompliancePage />} />
           </Route>
         </Route>
       </Routes>

@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "数据资产管理平台"
-    APP_VERSION: str = "0.1.0"
+    APP_NAME: str = "金融数据分类分级打标平台"
+    APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
     DATABASE_URL: str = "sqlite:///./data_assets.db"
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     DASHSCOPE_API_KEY: str = ""
+    ENCRYPTION_KEY: str = "change-me-in-production"
 
     class Config:
         env_file = ".env"

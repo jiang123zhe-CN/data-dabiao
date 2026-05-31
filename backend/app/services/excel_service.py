@@ -11,10 +11,8 @@ from app.models.user import User
 TEMPLATE_HEADERS = [
     "field_code", "name", "english_name", "data_type", "length",
     "precision", "table_name", "database_name", "business_domain",
-    "sensitivity_level", "description", "business_rules",
+    "sensitivity_level(自动)", "description", "business_rules",
 ]
-
-SENSITIVITY_OPTIONS = ["L1", "L2", "L3", "L4"]
 
 
 def generate_template() -> io.BytesIO:
@@ -22,7 +20,7 @@ def generate_template() -> io.BytesIO:
     ws = wb.active
     ws.title = "字段导入模板"
     ws.append(TEMPLATE_HEADERS)
-    ws.append(["F001", "客户名称", "customer_name", "VARCHAR", 100, None, "dim_customer", "ods", "客户域", "L1", "客户姓名", ""])
+    ws.append(["F001", "客户名称", "customer_name", "VARCHAR", 100, None, "dim_customer", "ods", "客户域", "", "客户姓名", ""])
 
     output = io.BytesIO()
     wb.save(output)
@@ -41,7 +39,9 @@ def parse_excel(file: BinaryIO) -> list[dict]:
         if all(v is None for v in row):
             continue
         row_dict = {}
-        for i, header in enumerate(TEMPLATE_HEADERS):
+        for i, header in enumerate(["field_code", "name", "english_name", "data_type", "length",
+                                     "precision", "table_name", "database_name", "business_domain",
+                                     "sensitivity_level", "description", "business_rules"]):
             val = row[i] if i < len(row) else None
             row_dict[header] = str(val).strip() if val is not None else None
         row_dict["_row"] = row_idx
@@ -56,6 +56,7 @@ def import_fields(db: Session, file: BinaryIO, user: User, file_name: str, file_
     total = len(rows)
     errors = []
     success = 0
+    new_field_ids = []
 
     import_record = ImportRecord(
         user_id=user.id,
@@ -82,10 +83,8 @@ def import_fields(db: Session, file: BinaryIO, user: User, file_name: str, file_
         if not row.get("table_name"):
             row_errors.append({"row": rownum, "field": "table_name", "message": "表名不能为空"})
 
-        sl = row.get("sensitivity_level", "L1")
-        if sl and sl not in SENSITIVITY_OPTIONS:
-            row_errors.append({"row": rownum, "field": "sensitivity_level", "message": f"敏感等级必须为 {SENSITIVITY_OPTIONS}"})
-            sl = "L1"
+        # sensitivity_level is optional - system auto-classifies
+        sl = row.get("sensitivity_level") or "L2"
 
         existing = db.query(Field).filter(Field.field_code == row["field_code"]).first()
         if existing:
@@ -127,6 +126,8 @@ def import_fields(db: Session, file: BinaryIO, user: User, file_name: str, file_
             created_by=user.id,
         )
         db.add(field)
+        db.flush()
+        new_field_ids.append(field.id)
         success += 1
 
     import_record.success_rows = success
@@ -135,6 +136,22 @@ def import_fields(db: Session, file: BinaryIO, user: User, file_name: str, file_
     import_record.error_details = json.dumps(errors, ensure_ascii=False) if errors else None
     db.commit()
     db.refresh(import_record)
+
+    # Auto-classify all newly imported fields via rule engine
+    if new_field_ids:
+        from app.services.rule_engine import RuleEngine
+        engine = RuleEngine(db)
+        for fid in new_field_ids:
+            field = db.query(Field).filter(Field.id == fid).first()
+            if field:
+                result = engine.classify_field(field)
+                if result["category_id"] or result["tier_level"]:
+                    field.classification_id = result.get("category_id") or field.classification_id
+                    field.sensitivity_level = result.get("tier_level") or field.sensitivity_level
+                    field.tagging_method = "rule_engine"
+                    field.tagging_confidence = result.get("confidence", 0.0)
+        db.commit()
+
     return import_record
 
 

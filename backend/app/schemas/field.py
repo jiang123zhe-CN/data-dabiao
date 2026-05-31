@@ -12,7 +12,7 @@ class FieldCreate(BaseModel):
     table_name: str = PydField(min_length=1, max_length=200)
     database_name: str | None = None
     business_domain: str | None = None
-    sensitivity_level: str = "L1"
+    sensitivity_level: str = "L2"
     description: str | None = None
     business_rules: str | None = None
 
