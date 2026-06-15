@@ -186,7 +186,8 @@ mv src/main.jsx.bak src/main.jsx
 mv src/services/api.js.bak src/services/api.js
 log "源文件已恢复"
 
-# ⑯ 部署静态文件到 Nginx 目录
+# ⑯ 部署静态文件到 Nginx 目录（先清空避免旧版本残留）
+rm -rf /var/www${APP_PATH}/*
 mkdir -p /var/www${APP_PATH}
 cp -r dist/* /var/www${APP_PATH}/
 chown -R www-data:www-data /var/www${APP_PATH}
